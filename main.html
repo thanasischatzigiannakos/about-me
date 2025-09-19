@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Athanasios Chatzigiannakos</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --bg-2: #0a1016;
+      --panel: rgba(255, 255, 255, 0.03);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --accent: #22d3ee; /* cyan-400 */
+      color-scheme: dark; /* hint form controls to render dark */
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      padding: 32px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 20% 0%, var(--bg-2), transparent) ,
+                  radial-gradient(1000px 600px at 80% 100%, #0c1218, transparent),
+                  var(--bg);
+    }
+
+    #terminal {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px 16px 12px;
+      background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03);
+      position: relative;
+      z-index: 1;
+      animation: glow 6s ease-in-out infinite;
+    }
+
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 0 rgba(0,0,0,0), inset 0 1px 0 rgba(255,255,255,0.03); }
+      50% { box-shadow: 0 10px 30px rgba(0,0,0,0.35), 0 0 24px rgba(34,211,238,0.15), inset 0 1px 0 rgba(255,255,255,0.03); }
+    }
+
+    .line {
+      margin: 8px 0;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .input-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .prompt {
+      color: var(--accent);
+      margin-right: 4px;
+      user-select: none;
+    }
+
+    input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      flex: 1;
+      caret-color: var(--accent);
+      letter-spacing: 0.2px;
+    }
+
+    ::selection { background: rgba(34, 211, 238, 0.25); }
+
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      #terminal { margin: 16px auto; padding: 16px 12px 8px; }
+    }
+    /* Background canvas */
+    #bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+    /* Link styling inside the terminal */
+    #terminal a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted rgba(34,211,238,0.5); }
+    #terminal a:hover { text-decoration: underline; border-bottom-color: transparent; }
+
+    /* Toolbar */
+    #toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+    #toolbar label { color: var(--muted); font-size: 12px; }
+    #themeSelect {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)) padding-box,
+        linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06)) border-box,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffffff' fill-opacity='0.85' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E") no-repeat right 10px center / 14px;
+      color: var(--text);
+      -webkit-text-fill-color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 36px 8px 12px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+      background-color: rgba(8, 12, 18, 0.7); 
+    }
+    #themeSelect:hover { border-color: rgba(255,255,255,0.16); }
+    #themeSelect:focus { box-shadow: 0 0 0 2px rgba(34,211,238,0.25); border-color: var(--accent); }
+    #themeSelect option { background-color: var(--bg-2); color: var(--text); }
+  </style>
+  </head>
+  <body>
+  <canvas id="bg"></canvas>
+  <div id="terminal">
+    <div id="toolbar">
+      <label for="themeSelect">Theme:</label>
+      <select id="themeSelect" aria-label="Theme selector">
+        <option value="cyan">Cyan Breeze</option>
+        <option value="dracula">Dracula</option>
+        <option value="solarized">Solarized Dark</option>
+        <option value="oneDark">One Dark</option>
+      </select>
+    </div>
+    <div class="input-line">
+      <span class="prompt">$</span>
+      <input id="input" autofocus />
+    </div>
+  </div>
+
+  <script>
+    const terminal = document.getElementById("terminal");
+    const input = document.getElementById("input");
+    const toolbar = document.getElementById("toolbar");
+    const themeSelect = document.getElementById("themeSelect");
+    const bg = document.getElementById("bg");
+    const ctx = bg.getContext ? bg.getContext('2d') : null;
+    let particles = [];
+    let energy = 0; // amplified briefly on keypresses
+
+    const themes = {
+      cyan: {
+        name: "Cyan Breeze",
+        vars: {
+          "--bg": "#0b0f14",
+          "--bg-2": "#0a1016",
+          "--panel": "rgba(255, 255, 255, 0.03)",
+          "--border": "rgba(255, 255, 255, 0.08)",
+          "--text": "#e5e7eb",
+          "--muted": "#9ca3af",
+          "--accent": "#22d3ee"
+        }
+      },
+      dracula: {
+        name: "Dracula",
+        vars: {
+          "--bg": "#1e1f29",
+          "--bg-2": "#282a36",
+          "--panel": "rgba(255,255,255,0.04)",
+          "--border": "rgba(255,255,255,0.10)",
+          "--text": "#f8f8f2",
+          "--muted": "#c5c8d4",
+          "--accent": "#bd93f9"
+        }
+      },
+      solarized: {
+        name: "Solarized Dark",
+        vars: {
+          "--bg": "#002b36",
+          "--bg-2": "#073642",
+          "--panel": "rgba(255,255,255,0.03)",
+          "--border": "rgba(255,255,255,0.08)",
+          "--text": "#e5e2d9",
+          "--muted": "#93a1a1",
+          "--accent": "#2aa198"
+        }
+      },
+      oneDark: {
+        name: "One Dark",
+        vars: {
+          "--bg": "#1b1f27",
+          "--bg-2": "#232833",
+          "--panel": "rgba(255,255,255,0.03)",
+          "--border": "rgba(255,255,255,0.10)",
+          "--text": "#abb2bf",
+          "--muted": "#7f8691",
+          "--accent": "#61afef"
+        }
+      }
+    };
+
+    function applyTheme(key) {
+      const theme = themes[key] || themes.cyan;
+      const root = document.documentElement.style;
+      Object.entries(theme.vars).forEach(([k, v]) => root.setProperty(k, v));
+      try { localStorage.setItem("terminal-theme", key); } catch {}
+      cacheAccent();
+    }
+
+    let ACCENT = '#22d3ee';
+    function cacheAccent() {
+      const cs = getComputedStyle(document.documentElement);
+      ACCENT = cs.getPropertyValue('--accent').trim() || '#22d3ee';
+    }
+
+    const commands = {
+      help: "Available: about, projects, contact, clear",
+      about: "I am Chatzigiannakos Athanasios. I have professional experience in backend development and cloud computing with experience in various programming languages including Java, Python and C# \nIn my personal projects, I enjoy tinkering with CLI tool development using Rust and customizing my Linux envrironment. \nI would love to be involved in open source projects and contribute to the community.",
+      projects: "- Backend Development - Led the development of Java Spring Boot microservices and python cloud functions for an energy company\n- Telecommunications - Participated in the development and Inttegration of different systems for a telecom provider \n- Developed a desktop application for the IT department of a local factory using C# and WPF \n- Dissertation: Implemented and compared various deep learning models for text classification (specifically software classification) using Python and libraries such as TensorFlow and Scikit-learn.",
+      contact: "Email: athanasioschatzigiannakos@gmail.com\nGitHub: https://github.com/thanasischatzigiannakos\nLinkedIn: www.linkedin.com/in/athanasios-chatzigiannakos",
+      clear: "clear"
+    };
+
+    function printLine(text, { typing = true, speed = 20, isHtml = false } = {}) {
+      const line = document.createElement("div");
+      line.className = "line";
+      terminal.insertBefore(line, input.parentElement);
+      if (!typing || !text) {
+        if (isHtml) {
+          line.innerHTML = text || "";
+          ensureSafeAnchors(line);
+        } else {
+        line.textContent = text || "";
+        }
+        return Promise.resolve();
+      }
+      return (isHtml ? typeHtml(line, text, speed) : typeText(line, text, speed))
+        .then(() => { if (isHtml) ensureSafeAnchors(line); });
+    }
+
+    function typeText(el, text, speed = 20) {
+      return new Promise(resolve => {
+        let i = 0;
+        const timer = setInterval(() => {
+          el.textContent = text.slice(0, i + 1);
+          i++;
+          if (i >= text.length) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, speed);
+      });
+    }
+
+
+    function typeHtml(el, html, speed = 20) {
+      return new Promise(resolve => {
+        let i = 0;
+        let out = "";
+        const step = () => {
+          if (i >= html.length) { el.innerHTML = out; resolve(); return; }
+          if (html[i] === "<") {
+            const end = html.indexOf(">", i);
+            const tag = html.slice(i, end + 1);
+            out += tag;
+            el.innerHTML = out;
+            i = end + 1;
+            requestAnimationFrame(step);
+          } else {
+            out += html[i];
+            el.innerHTML = out;
+            i++;
+            setTimeout(step, speed);
+          }
+        };
+        step();
+      });
+    }
+
+    function ensureSafeAnchors(scopeEl) {
+      scopeEl.querySelectorAll("a").forEach(a => {
+        if (!a.target) a.target = "_blank";
+        a.rel = "noopener noreferrer";
+      });
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function linkify(text) {
+      let html = escapeHtml(text).replace(/\n/g, "<br>");
+      // URLs with protocol
+      html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+      // URLs starting with www.
+      html = html.replace(/(^|\s)www\.([^\s<]+)/g, '$1<a href="https://www.$2" target="_blank" rel="noopener noreferrer">www.$2</a>');
+      // Emails
+      html = html.replace(/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g, '<a href="mailto:$1">$1</a>');
+      return html;
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const saved = (() => { try { return localStorage.getItem("terminal-theme"); } catch { return null; } })();
+      if (saved && themes[saved]) {
+        applyTheme(saved);
+        if (themeSelect) themeSelect.value = saved;
+      } else {
+        applyTheme("cyan");
+        if (themeSelect) themeSelect.value = "cyan";
+      }
+      printLine("Welcome! Type 'help' for commands.", { typing: true, speed: 15 });
+      initBackground();
+      animateBackground(0);
+    });
+
+    if (themeSelect) {
+      themeSelect.addEventListener("change", () => {
+        applyTheme(themeSelect.value);
+      });
+    }
+
+    function initBackground() {
+      if (!bg || !ctx) return;
+      resizeBg();
+      createParticles();
+      window.addEventListener('resize', () => { resizeBg(); createParticles(); });
+      input.addEventListener('keydown', () => { energy = Math.min(1, energy + 0.25); });
+    }
+
+    function resizeBg() {
+      if (!bg) return;
+      bg.width = window.innerWidth;
+      bg.height = window.innerHeight;
+    }
+
+    function createParticles() {
+      const count = Math.max(35, Math.min(120, Math.floor(window.innerWidth / 18)));
+      particles = new Array(count).fill(0).map(() => spawnParticle());
+      cacheAccent();
+    }
+
+    function spawnParticle() {
+      const s = Math.random() * 1.6 + 0.4; // size
+      const speed = (Math.random() * 0.25 + 0.05); // base speed
+      const dir = Math.random() * Math.PI * 2;
+      return {
+        x: Math.random() * (bg.width || window.innerWidth),
+        y: Math.random() * (bg.height || window.innerHeight),
+        vx: Math.cos(dir) * speed,
+        vy: Math.sin(dir) * speed,
+        r: s
+      };
+    }
+
+    function animateBackground() {
+      if (!ctx || !bg) return;
+      requestAnimationFrame(animateBackground);
+      ctx.clearRect(0, 0, bg.width, bg.height);
+      // fade a little to create trails
+      ctx.fillStyle = 'rgba(0,0,0,0.06)';
+      ctx.fillRect(0, 0, bg.width, bg.height);
+      const boost = 1 + energy * 3;
+      energy = Math.max(0, energy - 0.02);
+      for (const p of particles) {
+        p.x += p.vx * boost;
+        p.y += p.vy * boost;
+        // wrap around
+        if (p.x < -10) p.x = bg.width + 10;
+        if (p.x > bg.width + 10) p.x = -10;
+        if (p.y < -10) p.y = bg.height + 10;
+        if (p.y > bg.height + 10) p.y = -10;
+        drawParticle(p);
+      }
+    }
+
+    function drawParticle(p) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.fillStyle = ACCENT;
+      ctx.globalAlpha = 0.75;
+      ctx.shadowColor = ACCENT;
+      ctx.shadowBlur = 12 + (energy * 10);
+      ctx.arc(p.x, p.y, p.r + energy * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") {
+        const val = input.value.trim();
+        const line = document.createElement("div");
+        line.className = "line";
+        line.textContent = `$ ${val}`;
+        terminal.insertBefore(line, input.parentElement);
+
+        if (commands[val]) {
+          if (val === "clear") {
+            terminal.innerHTML = "";
+            if (toolbar) terminal.appendChild(toolbar);
+            terminal.appendChild(input.parentElement);
+          } else {
+            const content = commands[val];
+            const html = linkify(content);
+            printLine(html, { typing: true, speed: 15, isHtml: true });
+          }
+        } else if (val) {
+          printLine(`Command not found: ${val}`, { typing: true, speed: 15 });
+        }
+
+        input.value = "";
+        window.scrollTo(0, document.body.scrollHeight);
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        const current = input.value.trim();
+        const all = Object.keys(commands);
+        if (!current) return;
+        const matches = all.filter(cmd => cmd.startsWith(current));
+        if (matches.length === 1) {
+          input.value = matches[0] + ""; 
+        } else if (matches.length > 1) {
+          const common = commonPrefix(matches);
+          if (common.length > current.length) {
+            input.value = common;
+          }
+          // show suggestions
+          const suggestions = matches.join("    ");
+          const suggestionLine = document.createElement("div");
+          suggestionLine.className = "line";
+          suggestionLine.textContent = suggestions;
+          terminal.insertBefore(suggestionLine, input.parentElement);
+        }
+      }
+    });
+
+    function commonPrefix(list) {
+      if (!list.length) return "";
+      let prefix = list[0];
+      for (let i = 1; i < list.length; i++) {
+        const item = list[i];
+        let j = 0;
+        while (j < prefix.length && j < item.length && prefix[j] === item[j]) j++;
+        prefix = prefix.slice(0, j);
+        if (!prefix) break;
+      }
+      return prefix;
+    }
+  </script>
+</body>
+</html>
