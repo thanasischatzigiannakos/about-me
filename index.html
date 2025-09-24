@@ -278,7 +278,7 @@
 
     input.addEventListener("keydown", e => {
       if (e.key === "Enter") {
-        const val = input.value.trim();
+        const val = input.value.trim().toLowerCase();
         const line = document.createElement("div");
         line.className = "line";
         line.textContent = `$ ${val}`;
