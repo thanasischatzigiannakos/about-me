@@ -7,15 +7,14 @@
   <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-  <canvas id="bg"></canvas>
   <div id="terminal">
     <div id="toolbar">
       <label for="themeSelect">Theme:</label>
       <select id="themeSelect" aria-label="Theme selector">
-        <option value="cyan">Cyan Breeze</option>
-        <option value="dracula">Dracula</option>
-        <option value="solarized">Solarized Dark</option>
-        <option value="oneDark">One Dark</option>
+        <option value="crt">CRT Green</option>
+        <option value="amber">Amber Pulse</option>
+        <option value="violet">Vector Violet</option>
+        <option value="ice">Ice Blue</option>
       </select>
     </div>
     <div class="input-line">
@@ -29,74 +28,65 @@
     const input = document.getElementById("input");
     const toolbar = document.getElementById("toolbar");
     const themeSelect = document.getElementById("themeSelect");
-    const bg = document.getElementById("bg");
-    const ctx = bg.getContext ? bg.getContext('2d') : null;
-    let particles = [];
-    let energy = 0; // amplified briefly on keypresses
+    const DEFAULT_THEME = "crt";
+    const STARTUP_MESSAGE = "Boot sequence complete. Type 'help' for commands.";
 
     const themes = {
-      cyan: {
-        name: "Cyan Breeze",
+      crt: {
+        name: "CRT Green",
         vars: {
-          "--bg": "#0b0f14",
-          "--bg-2": "#0a1016",
-          "--panel": "rgba(255, 255, 255, 0.03)",
-          "--border": "rgba(255, 255, 255, 0.08)",
-          "--text": "#e5e7eb",
-          "--muted": "#9ca3af",
-          "--accent": "#22d3ee"
+          "--bg": "#010701",
+          "--bg-2": "#041004",
+          "--panel": "rgba(4, 16, 4, 0.92)",
+          "--border": "rgba(152, 255, 102, 0.35)",
+          "--text": "#d8ffd0",
+          "--muted": "#7ad27a",
+          "--accent": "#9bff5d"
         }
       },
-      dracula: {
-        name: "Dracula",
+      amber: {
+        name: "Amber Pulse",
         vars: {
-          "--bg": "#1e1f29",
-          "--bg-2": "#282a36",
-          "--panel": "rgba(255,255,255,0.04)",
-          "--border": "rgba(255,255,255,0.10)",
-          "--text": "#f8f8f2",
-          "--muted": "#c5c8d4",
-          "--accent": "#bd93f9"
+          "--bg": "#1a0700",
+          "--bg-2": "#280b00",
+          "--panel": "rgba(32, 8, 0, 0.9)",
+          "--border": "rgba(255, 191, 120, 0.35)",
+          "--text": "#ffe1b3",
+          "--muted": "#d68f4c",
+          "--accent": "#ff9f43"
         }
       },
-      solarized: {
-        name: "Solarized Dark",
+      violet: {
+        name: "Vector Violet",
         vars: {
-          "--bg": "#002b36",
-          "--bg-2": "#073642",
-          "--panel": "rgba(255,255,255,0.03)",
-          "--border": "rgba(255,255,255,0.08)",
-          "--text": "#e5e2d9",
-          "--muted": "#93a1a1",
-          "--accent": "#2aa198"
+          "--bg": "#060013",
+          "--bg-2": "#100024",
+          "--panel": "rgba(12, 0, 30, 0.92)",
+          "--border": "rgba(196, 140, 255, 0.32)",
+          "--text": "#f3e9ff",
+          "--muted": "#b58ae0",
+          "--accent": "#c792ff"
         }
       },
-      oneDark: {
-        name: "One Dark",
+      ice: {
+        name: "Ice Blue",
         vars: {
-          "--bg": "#1b1f27",
-          "--bg-2": "#232833",
-          "--panel": "rgba(255,255,255,0.03)",
-          "--border": "rgba(255,255,255,0.10)",
-          "--text": "#abb2bf",
-          "--muted": "#7f8691",
-          "--accent": "#61afef"
+          "--bg": "#01121d",
+          "--bg-2": "#021e2f",
+          "--panel": "rgba(2, 18, 32, 0.9)",
+          "--border": "rgba(126, 190, 255, 0.35)",
+          "--text": "#d6f1ff",
+          "--muted": "#81aac7",
+          "--accent": "#7cd3ff"
         }
       }
     };
 
     function applyTheme(key) {
-      const theme = themes[key] || themes.cyan;
+      const theme = themes[key] || themes[DEFAULT_THEME];
       const root = document.documentElement.style;
       Object.entries(theme.vars).forEach(([k, v]) => root.setProperty(k, v));
       try { localStorage.setItem("terminal-theme", key); } catch {}
-      cacheAccent();
-    }
-
-    let ACCENT = '#22d3ee';
-    function cacheAccent() {
-      const cs = getComputedStyle(document.documentElement);
-      ACCENT = cs.getPropertyValue('--accent').trim() || '#22d3ee';
     }
 
     const commands = {
@@ -106,6 +96,10 @@
       contact: "Email: athanasioschatzigiannakos@gmail.com\nGitHub: https://github.com/thanasischatzigiannakos\nLinkedIn: www.linkedin.com/in/athanasios-chatzigiannakos",
       clear: "clear"
     };
+
+    function showStartupMessage({ typing = true } = {}) {
+      return printLine(STARTUP_MESSAGE, { typing, speed: 15 });
+    }
 
     function printLine(text, { typing = true, speed = 20, isHtml = false } = {}) {
       const line = document.createElement("div");
@@ -192,88 +186,16 @@
 
     window.addEventListener("DOMContentLoaded", () => {
       const saved = (() => { try { return localStorage.getItem("terminal-theme"); } catch { return null; } })();
-      if (saved && themes[saved]) {
-        applyTheme(saved);
-        if (themeSelect) themeSelect.value = saved;
-      } else {
-        applyTheme("cyan");
-        if (themeSelect) themeSelect.value = "cyan";
-      }
-      printLine("Welcome! Type 'help' for commands.", { typing: true, speed: 15 });
-      initBackground();
-      animateBackground(0);
+      const initial = (saved && themes[saved]) ? saved : DEFAULT_THEME;
+      applyTheme(initial);
+      if (themeSelect) themeSelect.value = initial;
+      showStartupMessage({ typing: true });
     });
 
     if (themeSelect) {
       themeSelect.addEventListener("change", () => {
         applyTheme(themeSelect.value);
       });
-    }
-
-    function initBackground() {
-      if (!bg || !ctx) return;
-      resizeBg();
-      createParticles();
-      window.addEventListener('resize', () => { resizeBg(); createParticles(); });
-      input.addEventListener('keydown', () => { energy = Math.min(1, energy + 0.25); });
-    }
-
-    function resizeBg() {
-      if (!bg) return;
-      bg.width = window.innerWidth;
-      bg.height = window.innerHeight;
-    }
-
-    function createParticles() {
-      const count = Math.max(35, Math.min(120, Math.floor(window.innerWidth / 18)));
-      particles = new Array(count).fill(0).map(() => spawnParticle());
-      cacheAccent();
-    }
-
-    function spawnParticle() {
-      const s = Math.random() * 1.6 + 0.4; // size
-      const speed = (Math.random() * 0.25 + 0.05); // base speed
-      const dir = Math.random() * Math.PI * 2;
-      return {
-        x: Math.random() * (bg.width || window.innerWidth),
-        y: Math.random() * (bg.height || window.innerHeight),
-        vx: Math.cos(dir) * speed,
-        vy: Math.sin(dir) * speed,
-        r: s
-      };
-    }
-
-    function animateBackground() {
-      if (!ctx || !bg) return;
-      requestAnimationFrame(animateBackground);
-      ctx.clearRect(0, 0, bg.width, bg.height);
-      // fade a little to create trails
-      ctx.fillStyle = 'rgba(0,0,0,0.06)';
-      ctx.fillRect(0, 0, bg.width, bg.height);
-      const boost = 1 + energy * 3;
-      energy = Math.max(0, energy - 0.02);
-      for (const p of particles) {
-        p.x += p.vx * boost;
-        p.y += p.vy * boost;
-        // wrap around
-        if (p.x < -10) p.x = bg.width + 10;
-        if (p.x > bg.width + 10) p.x = -10;
-        if (p.y < -10) p.y = bg.height + 10;
-        if (p.y > bg.height + 10) p.y = -10;
-        drawParticle(p);
-      }
-    }
-
-    function drawParticle(p) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.fillStyle = ACCENT;
-      ctx.globalAlpha = 0.75;
-      ctx.shadowColor = ACCENT;
-      ctx.shadowBlur = 12 + (energy * 10);
-      ctx.arc(p.x, p.y, p.r + energy * 0.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     }
 
     input.addEventListener("keydown", e => {
@@ -289,6 +211,7 @@
             terminal.innerHTML = "";
             if (toolbar) terminal.appendChild(toolbar);
             terminal.appendChild(input.parentElement);
+            showStartupMessage({ typing: false });
           } else {
             const content = commands[val];
             const html = linkify(content);
