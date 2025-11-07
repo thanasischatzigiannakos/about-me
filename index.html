@@ -29,6 +29,7 @@
     const toolbar = document.getElementById("toolbar");
     const themeSelect = document.getElementById("themeSelect");
     const DEFAULT_THEME = "crt";
+    const STARTUP_MESSAGE = "Boot sequence complete. Type 'help' for commands.";
 
     const themes = {
       crt: {
@@ -95,6 +96,10 @@
       contact: "Email: athanasioschatzigiannakos@gmail.com\nGitHub: https://github.com/thanasischatzigiannakos\nLinkedIn: www.linkedin.com/in/athanasios-chatzigiannakos",
       clear: "clear"
     };
+
+    function showStartupMessage({ typing = true } = {}) {
+      return printLine(STARTUP_MESSAGE, { typing, speed: 15 });
+    }
 
     function printLine(text, { typing = true, speed = 20, isHtml = false } = {}) {
       const line = document.createElement("div");
@@ -184,7 +189,7 @@
       const initial = (saved && themes[saved]) ? saved : DEFAULT_THEME;
       applyTheme(initial);
       if (themeSelect) themeSelect.value = initial;
-      printLine("Boot sequence complete. Type 'help' for commands.", { typing: true, speed: 15 });
+      showStartupMessage({ typing: true });
     });
 
     if (themeSelect) {
@@ -206,6 +211,7 @@
             terminal.innerHTML = "";
             if (toolbar) terminal.appendChild(toolbar);
             terminal.appendChild(input.parentElement);
+            showStartupMessage({ typing: false });
           } else {
             const content = commands[val];
             const html = linkify(content);
